@@ -1,0 +1,68 @@
+# ==============================================================================
+# Bandhoo Docker Build Context Exclusions (.dockerignore)
+# ==============================================================================
+
+# Version Control
+.git
+.gitignore
+.gitattributes
+.github
+
+# Frontend Assets & Node.js Artifacts (Decoupled React SPA)
+node_modules
+src
+public
+dist
+dist-ssr
+index.html
+vite.config.js
+eslint.config.js
+package.json
+package-lock.json
+
+# Python Bytecode and Cache Directories
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Testing, Benchmarks, and Evaluation Reports
+.pytest_cache/
+.coverage
+htmlcov/
+tests/
+benchmark/
+research_preparation/
+reports/
+
+# Runtime Data, Logs, and Local SQLite Databases
+*.db
+*.sqlite
+*.sqlite3
+private_storage/
+logs/
+*.log
+
+# Environment Files and Secrets
+.env
+.env.*
+!.env.example
+
+# Infrastructure as Code & Orchestration Files
+terraform/
+k8s/
+monitoring/
+
+# IDE, OS and Temporary Files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+

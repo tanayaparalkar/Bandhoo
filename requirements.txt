@@ -1,19 +1,32 @@
 # Bandhoo backend (main.py, legal_engine/, benchmark/).
-# Lower bounds are the versions the test suite was last run with (Python 3.14).
-fastapi>=0.148.0
-uvicorn>=0.54.0
-pydantic>=2.14.1
-numpy>=2.5.4
-scipy>=1.18.1
+# Bounds adjusted for Python 3.11 runtime compatibility while supporting Python 3.12-3.14.
+fastapi>=0.115.0
+uvicorn>=0.34.0
+pydantic>=2.10.0
+numpy>=1.26.0
+scipy>=1.13.0
 rank-bm25>=0.2.2
 google-genai>=2.31.0
-python-dotenv>=1.2.4
+python-dotenv>=1.1.0
 # Complaint-structuring workflow (complaint_engine/). Tested with langgraph 1.2.16
 # (langchain-core 1.6.12, langgraph-checkpoint 4.3.0) on Python 3.14.6.
 # Keep LangSmith tracing off (LANGSMITH_TRACING / LANGCHAIN_TRACING_V2 unset); the workflow refuses to
 # start with tracing enabled unless BANDHOO_ALLOW_EXTERNAL_TRACING=1 is set under an approved data policy.
 langgraph>=1.2.16
+langchain-core>=0.3.0
 
 # Tests
-pytest>=9.1.1
+pytest>=9.0.0
+
+# Database Persistence & Migrations (db/, migrations/)
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.9
+
+# Document Generation (complaint_engine/pdf_generator.py)
+reportlab>=4.0.0
+
+# MLOps Monitoring & Prometheus Instrumentation (Phase 1)
+prometheus-fastapi-instrumentator>=7.0.0
+
 

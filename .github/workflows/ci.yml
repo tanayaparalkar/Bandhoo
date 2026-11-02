@@ -1,0 +1,126 @@
+name: Bandhoo CI Pipeline
+
+'on':
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+# Least-privilege token: the pipeline only needs to read repository contents.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run Unit & Regression Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Execute Automated Test Suite (Pytest)
+        env:
+          BANDHOO_SKIP_DOTENV: "1"
+          BANDHOO_STORAGE_DIR: "/tmp/bandhoo_test_storage"
+        run: |
+          pytest -v --tb=short
+
+  build-docker:
+    name: Build & Smoke-Test Docker Container
+    runs-on: ubuntu-latest
+    needs: test
+
+    env:
+      IMAGE_TAG: bandhoo-backend:test
+      CONTAINER_NAME: bandhoo-container
+      BASE_URL: http://127.0.0.1:8001
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Build Production Docker Image
+        run: |
+          docker build -t "$IMAGE_TAG" .
+
+      - name: Start Container
+        run: |
+          docker run -d --name "$CONTAINER_NAME" -p 8001:8001 "$IMAGE_TAG"
+
+      - name: Wait for /health (startup polling)
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          MAX_ATTEMPTS=30
+          SLEEP_SECONDS=2
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            # Fail fast if the container has exited (e.g. lifespan/DB init crash).
+            STATE="$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || echo false)"
+            if [ "$STATE" != "true" ]; then
+              echo "::error::Container $CONTAINER_NAME is not running (attempt $attempt)."
+              exit 1
+            fi
+            CODE="$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/health" || true)"
+            if [ "$CODE" = "200" ]; then
+              echo "/health returned HTTP 200 after $attempt attempt(s)."
+              exit 0
+            fi
+            echo "Attempt $attempt/$MAX_ATTEMPTS: /health not ready (HTTP ${CODE:-none}); retrying in ${SLEEP_SECONDS}s..."
+            sleep "$SLEEP_SECONDS"
+          done
+          echo "::error::/health did not return HTTP 200 within $((MAX_ATTEMPTS * SLEEP_SECONDS))s."
+          exit 1
+
+      - name: Validate /health Response
+        run: |
+          set -euo pipefail
+          BODY="$(curl -f -s -S "$BASE_URL/health")"
+          echo "/health body: $BODY"
+          echo "$BODY" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"healthy"' \
+            || { echo "::error::/health did not report status=healthy"; exit 1; }
+
+      - name: Validate /metrics Response
+        run: |
+          set -euo pipefail
+          # Generate one instrumented request so request-level series are populated.
+          curl -f -s -S -o /dev/null "$BASE_URL/api/bns-stats"
+          BODY="$(curl -f -s -S "$BASE_URL/metrics")"
+          echo "$BODY" | head -n 20
+          echo "$BODY" | grep -q 'bandhoo_requests_in_progress' \
+            || { echo "::error::/metrics is missing bandhoo_requests_in_progress"; exit 1; }
+          echo "Container smoke test passed."
+
+      - name: Container Diagnostics & Teardown
+        if: always()
+        run: |
+          # Diagnostics only: never fails this step, so the original failure stays visible.
+          if docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
+            echo "=== docker logs $CONTAINER_NAME ==="
+            docker logs "$CONTAINER_NAME" || true
+            docker stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
+            docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+            echo "Container removed."
+          else
+            echo "Container $CONTAINER_NAME was never created; nothing to clean up."
+          fi

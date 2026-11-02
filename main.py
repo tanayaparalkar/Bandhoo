@@ -8,6 +8,8 @@ if os.environ.get("BANDHOO_SKIP_DOTENV") != "1":
         load_dotenv()
     except ImportError:
         pass
+from contextlib import asynccontextmanager
+import logging
 from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +19,27 @@ import uvicorn
 
 from complaint_engine import ComplaintStructureRequest, assess_point, structure_for_api
 
-app = FastAPI()
+api_logger = logging.getLogger("bandhoo.api")
+metrics_logger = logging.getLogger("bandhoo.metrics")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan context manager.
+    Safely initializes persistent database schema on startup without silently swallowing failures.
+    """
+    try:
+        from db.session import init_db
+        init_db()
+        api_logger.info("[Startup] Database tables initialized and verified successfully.")
+    except Exception as exc:
+        api_logger.error("[Startup] Database initialization failed: %s", exc, exc_info=True)
+        raise
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 # CORS restrictions: configurable via BANDHOO_CORS_ORIGINS; defaults to local development origins.
 CORS_ORIGINS_ENV = os.environ.get("BANDHOO_CORS_ORIGINS", "")
@@ -39,6 +61,31 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# ── Prometheus Metrics Instrumentation (MLOps Phase 1) ──
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    Instrumentator(
+        should_group_status_codes=False,
+        should_ignore_untemplated=True,
+        should_respect_env_var=True,
+        should_instrument_requests_inprogress=True,
+        excluded_handlers=["/metrics", "/health", "/api/health/db"],
+        env_var_name="ENABLE_METRICS",
+        inprogress_name="bandhoo_requests_in_progress",
+        inprogress_labels=True,
+    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=True)
+    metrics_logger.info("[Metrics] Prometheus metrics instrumentation actively exposed at /metrics.")
+except ImportError as imp_err:
+    metrics_logger.error(
+        "[Metrics] prometheus-fastapi-instrumentator is not installed. /metrics endpoint is unavailable: %s",
+        imp_err
+    )
+    if os.environ.get("REQUIRE_METRICS") == "1" or os.environ.get("BANDHOO_ENV") == "production":
+        raise
+except Exception as exc:
+    metrics_logger.error("[Metrics] Failed to initialize Prometheus instrumentation: %s", exc, exc_info=True)
+    raise
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request, exc):
@@ -234,6 +281,19 @@ async def email_draft_endpoint(data: ComplaintStructureRequest, recipient_email:
         return draft.model_dump()
     finally:
         db.close()
+
+
+@app.get("/health")
+async def health():
+    """
+    Kubernetes liveness and readiness probe endpoint.
+    Returns 200 OK with service and version status.
+    """
+    return {
+        "status": "healthy",
+        "service": "bandhoo-backend",
+        "version": "1.0.0"
+    }
 
 
 @app.get("/api/health/db")
