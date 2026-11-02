@@ -39,6 +39,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Enforce Read-Only Permissions on Corpus Backup
+        run: chmod 444 reports/backups/bns_rag_dataset.pre_integrity_migration_2026-10-20.json
+
       - name: Execute Automated Test Suite (Pytest)
         env:
           BANDHOO_SKIP_DOTENV: "1"
