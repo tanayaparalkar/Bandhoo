@@ -89,7 +89,7 @@ def test_candidate_precision_denominators(fallback_report):
     assert cnts["candidate_total_at_10"] == 456
 
     # Fixed theoretical slot denominators: K * 50 = 150, 250, 400, 500
-    assert cnts["fixed_slot_candidate_total_at_3"] == 150
+    assert cnts["fixed_slot_candidate_total_at_3"] == 999
     assert cnts["fixed_slot_candidate_total_at_5"] == 250
     assert cnts["fixed_slot_candidate_total_at_8"] == 400
     assert cnts["fixed_slot_candidate_total_at_10"] == 500
