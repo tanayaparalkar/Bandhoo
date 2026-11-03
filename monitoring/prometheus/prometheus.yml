@@ -1,0 +1,24 @@
+# ==============================================================================
+# Prometheus Scrape Configuration for Bandhoo Decision-Support Backend
+# ==============================================================================
+
+global:
+  scrape_interval: 15s       # Global default scrape interval
+  evaluation_interval: 15s   # Interval for rule evaluations
+  scrape_timeout: 10s        # Per-scrape timeout
+
+scrape_configs:
+  - job_name: "bandhoo-backend"
+    metrics_path: "/metrics"
+    scheme: "http"
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    static_configs:
+      - targets:
+          - "13.232.16.110:8001"
+        labels:
+          app: "bandhoo"
+          environment: "aws-ecs-fargate"
+          region: "ap-south-1"
+          component: "backend"
+

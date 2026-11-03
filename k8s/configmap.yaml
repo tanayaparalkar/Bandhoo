@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bandhoo-config
+  labels:
+    app: bandhoo-backend
+    app.kubernetes.io/name: bandhoo
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: bandhoo-mlops
+data:
+  BANDHOO_HOST: "0.0.0.0"
+  BANDHOO_PORT: "8001"
+  BANDHOO_STORAGE_DIR: "/app/private_storage"
+  BANDHOO_SKIP_DOTENV: "1"
+  REQUIRE_METRICS: "1"
+  ENABLE_METRICS: "true"
+  BANDHOO_CORS_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
+  DATABASE_URL: "sqlite:///bandhoo_persistence.db"
+

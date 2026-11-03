@@ -1,0 +1,39 @@
+# ==============================================================================
+# Terraform Git Ignore Rules
+# ==============================================================================
+
+# Local .terraform directories
+.terraform/
+**/.terraform/*
+
+# Preserve provider dependency lock file for deterministic reproducibility
+!.terraform.lock.hcl
+
+# Terraform state and backup files
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Saved Terraform execution plan files
+*.tfplan
+tfplan*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Exclude all private .tfvars files with potential secrets except the template
+*.tfvars
+*.tfvars.json
+!terraform.tfvars.example
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+
